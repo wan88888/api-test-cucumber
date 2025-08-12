@@ -1,0 +1,55 @@
+name: API Tests
+
+# 触发条件
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  # schedule:
+  #   # 每天UTC时间02:00运行（北京时间10:00）
+  #   - cron: '0 2 * * *'
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout代码
+      uses: actions/checkout@v4
+      
+    - name: 设置Java环境
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: 缓存Maven依赖
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: 运行API测试
+      run: mvn clean test
+      
+    - name: 上传测试报告
+      uses: actions/upload-artifact@v4
+      if: always() # 即使测试失败也上传报告
+      with:
+        name: test-reports
+        path: |
+          target/cucumber-reports.html
+          target/surefire-reports/
+        retention-days: 30
+        
+    - name: 发布测试结果
+      uses: dorny/test-reporter@v1
+      if: always()
+      with:
+        name: API Test Results
+        path: target/surefire-reports/*.xml
+        reporter: java-junit
+        fail-on-error: true
